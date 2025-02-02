@@ -1,0 +1,29 @@
+{
+  "activeMarketplace": { "displayName": "Localhost", "url": "http://localhost:5233" },
+  "default": false,
+  "activeIdentity": {
+    "did": "did:chia:18nq8dn6nl659mzjkwtmkffvdh3kekskeen33g6m574d5k6xg3z4q5hx236",
+    "currentNostrPublicKey": "4e4ca45eb329b2e97135c8081921fd247e6dfc5f6e4bb4193e069e2f68606aa2",
+    "proof": "a92cd4f79a1845a332c397e42d299e8d42e8b1fb6e9157f926d5e230b63e04d0d81a97ba20c38ce0b1dbf685beea4f38119319e12c0a62fa0dff25b6b24c6a0574297d87f4387bc95a6de40227ea5a3ad36667c546eb940fa1abde163a353ca7"
+  },
+  "identities": [
+    {
+      "did": "did:chia:1jp85jqdf3scmdpe0tweyhwsa7emg07gk3j69x2j06n2l0hep0fzqv6c86n",
+      "currentNostrPublicKey": "60dc6d77158b6b326fa2ef5a35135e534c6f30d3abdd724321c55f3cc1bb8a1a",
+      "proof": "b9e44bba35e9b7cbee99bacc60175442728b49f4877bc4da09906041f169a196e695cb43834669a9dd9617cae81d8481189a0c851fe3973ff1fa1b3139df993cc1598af08192dfaa06230067d950b55a5638801c83ad3716dac343726fedb56d"
+    }
+  ],
+  "installsPath": "/home/slime/.slime/installs/",
+  "marketplaces": [
+    { "displayName": "Slime Marketplace", "url": "http://api.slimenetwork.org" },
+    { "displayName": "Localhost", "url": "http://localhost:5233" }
+  ],
+  "mediaDataPath": "/home/slime/.slime/media/",
+  "mintingDataPath": "/home/slime/.slime/minting/",
+  "nostrRelays": [
+    { "displayName": "Slime Relay 1", "url": "ws://api.slimenetwork.org:7000" }
+  ],
+  "torrentClientPort": 5235,
+  "torrentsPath": "/home/slime/.slime/torrents/",
+  "languages": ["English"]
+}

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/tauri";
-import { Grid, ButtonBase, Typography, styled, Button } from "@mui/material";
+import { Grid, ButtonBase, Typography, styled, Box } from "@mui/material";
 import "./App.css";
+import React from "react";
 
 function App() {
 
@@ -11,46 +12,46 @@ function App() {
 
   const apps = [
     {
-      name: "gosti-library",
+      name: "slime-library",
       title: "Library",
-      url: "../resources/apps/gosti-library-dapp/index.html",
-      logo: "../resources/apps/gosti-library-dapp/icon.webp",
+      url: "../resources/apps/slime-library-dapp/index.html",
+      logo: "../resources/apps/slime-library-dapp/icon.svg",
     },
     {
-      name: "gosti-marketplace",
-      title: "Gosti Marketplace",
-      url: "../resources/apps/gosti-marketplace-dapp/index.html",
-      logo: "../resources/apps/gosti-marketplace-dapp/icon.webp",
+      name: "slime-marketplace",
+      title: "Slime Marketplace",
+      url: "../resources/apps/slime-marketplace-dapp/index.html",
+      logo: "../resources/apps/slime-marketplace-dapp/icon.svg",
     },
     {
-      name: "gosti-publishing",
+      name: "slime-publishing",
       title: "Publishing",
-      url: "../resources/apps/gosti-marketplace-publishing-dapp/index.html",
-      logo: "../resources/apps/gosti-marketplace-publishing-dapp/icon.webp",
+      url: "../resources/apps/slime-marketplace-publishing-dapp/index.html",
+      logo: "../resources/apps/slime-marketplace-publishing-dapp/icon.svg",
     },
     {
-      name: "gosti-profile",
-      title: "Profile",
-      url: "../resources/apps/gosti-profile-app/index.html",
-      logo: "../resources/apps/gosti-profile-app/icon.webp",
+      name: "slime-settings",
+      title: "Settings",
+      url: "../resources/apps/slime-settings-app/index.html",
+      logo: "../resources/apps/slime-settings-app/icon.svg",
     },
     {
       name: "chia-poker",
       title: "Chia Poker", 
       url: "../resources/apps/chia-poker/index.html", 
-      logo: "../resources/apps/chia-poker/icon.webp"
+      logo: "../resources/apps/chia-poker/icon.svg"
     },
     {
-      name: "gosti-streaming-tools",
+      name: "slime-streaming-tools",
       title: "Streaming Tools",
-      url: "../resources/apps/gosti-streaming-tools/index.html",
-      logo: "../resources/apps/gosti-streaming-tools/icon.webp",
+      url: "../resources/apps/slime-streaming-tools/index.html",
+      logo: "../resources/apps/slime-streaming-tools/icon.svg",
     },
     {
-      name: "about-gosti",
+      name: "about-slime",
       title: "About",
       url: "../resources/apps/about/index.html",
-      logo: "../resources/apps/about/icon.webp",
+      logo: "../resources/apps/about/icon.svg",
     },
   ];
 
@@ -119,12 +120,36 @@ function App() {
     transition: theme.transitions.create('opacity'),
   }));
 
+  const [collapseImage, setCollapseImage] = React.useState(false);
+
+  React.useEffect(() => {
+    function handleResize() {
+      console.log("resize", window.innerHeight);
+      const windowHeight = window.innerHeight;
+      if (windowHeight < 600 || window.innerWidth < 200) {
+        setCollapseImage(true);
+      } else {
+        setCollapseImage(false);
+      }
+    }
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
   return (
     <div className="container">
-      <img src="src/assets/GostiAnim.webp" width="100%" style={{maxWidth: '500px', alignSelf: 'center'}} />
-      <h2>Installed Apps</h2>
+      {!collapseImage && 
+        <Box sx={{height:"30vh", width:"100%", alignItems:"center", display:"flex", justifyContent:"center"}}> 
+          <img src="src/assets/SlimeNetworkAnim.webp" style={{maxWidth:"90%", maxHeight:"90%", alignSelf: 'center'}} />
+        </Box>
+      }
+      {/* <h2>Installed Apps</h2> */}
 
-      <div className="row">
+      <Box sx={{overflowY:"auto", overflowX:"hidden", height:`${collapseImage ? "100vh" : "70vh"}`}}> 
         <Grid container spacing={1}>
           {apps.map((app) => (
             <Grid key={app.title} item xs={12} sm={6} md={4} lg={3}>
@@ -158,7 +183,7 @@ function App() {
             </Grid>
           ))}
         </Grid>
-      </div>
+      </Box>
     </div>
   );
 }

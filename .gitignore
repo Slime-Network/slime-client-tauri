@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+__pycache__
+*.so
+*.so*
+build
+venv
+*python-x*
+*torrentclient-x8*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
