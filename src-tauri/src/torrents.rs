@@ -9,8 +9,7 @@ use jsonrpsee::rpc_params;
 use serde_json::json;
 use std::fs;
 use rfd::FileDialog;
-
-
+use rusqlite::{Connection, Result};
 
 
 #[tauri::command]
@@ -70,16 +69,41 @@ pub async fn delete_media(app: tauri::AppHandle, params: serde_json::Value) -> R
     }
 }
 
-async fn delete_media_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
+async fn delete_media_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
     
-    let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+    
+    let mut stmt = conn.prepare("SELECT * FROM activeConfig WHERE id = 1").map_err(|e| format!("Error preparing statement: {}", e))?;
+    let config = stmt.query_row([], |row| {
+        let did: Option<String> = row.get(1)?;
+        let active_proof: Option<String> = row.get(2)?;
+        let marketplace_display_name: Option<String> = row.get(3)?;
+        let marketplace_url: Option<String> = row.get(4)?;
+        let torrent_client_port: Option<i32> = row.get(5)?;
+        let languages: Option<String> = row.get(6)?;
+        let install_path: Option<String> = row.get(7)?;
+        let install_path_display_name: Option<String> = row.get(8)?;
+        let torrent_path: Option<String> = row.get(9)?;
+        let torrent_path_display_name: Option<String> = row.get(10)?;
+        let minting_data_path: Option<String> = row.get(11)?;
+        Ok(serde_json::json!({
+            "did": did,
+            "activeProof": active_proof,
+            "marketplaceDisplayName": marketplace_display_name,
+            "marketplaceUrl": marketplace_url,
+            "torrentClientPort": torrent_client_port,
+            "languages": languages,
+            "installPath": install_path,
+            "installPathDisplayName": install_path_display_name,
+            "torrentPath": torrent_path,
+            "torrentPathDisplayName": torrent_path_display_name,
+            "mintingDataPath": minting_data_path
+        }))
+    }).unwrap();
 
     let torrents_path = format!("{}/{}", config["torrentsPath"], params["productId"].as_str().unwrap());
     let media_data_path = format!("{}/{}", config["mediaDataPath"], params["productId"].as_str().unwrap());
-    
+
     fs::remove_dir_all(torrents_path).map_err(|e| format!("Error deleting directory: {}", e))?;
     fs::remove_dir_all(media_data_path).map_err(|e| format!("Error deleting directory: {}", e))?;
 
@@ -244,13 +268,17 @@ async fn generate_torrent_impl(app: tauri::AppHandle, params: serde_json::Value)
 
 	let client = HttpClient::builder().build("http://localhost:5235").unwrap();
 
-    let params = rpc_params![params["mediaFiles"].clone(), full_path, torrent_path];
-	let response: Result<String, _> = client.request("generateTorrent",  params).await;
+    let file_name = format!("{}/{}-{}.zip", torrent_path, params["mediaFiles"]["name"].as_str().unwrap(), params["mediaFiles"]["version"].as_str().unwrap());
 
-    println!("response: {:?}", response);
+    let params = rpc_params![params["mediaFiles"].clone(), full_path, file_name];
+    let response: Result<serde_json::Value, _> = client.request("generateTorrent",  params).await.map_err(|e| format!("Error generating torrent: {}", e));
+
+    let resp = response.unwrap();
 
     Ok(json!({
-        "torrents": "torrent1",
+        "torrent": resp["torrent"],
+        "fileName": resp["fileName"],
+        "size": resp["size"],
         "message": "Torrents generated"
     }))
 }

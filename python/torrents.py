@@ -6,10 +6,11 @@ import time
 import traceback
 from threading import Thread
 
+from slime_db import SlimeDB
 from util import Singleton
 
 class TorrentHandler(metaclass=Singleton):
-    def __init__(self, args):
+    def __init__(self):
         print("starting torrent handler")
         self.session = libtorrent.session(
             {"listen_interfaces": "0.0.0.0:6881", "user_agent": "Slime_Client"}
@@ -17,18 +18,16 @@ class TorrentHandler(metaclass=Singleton):
         self.session.start_dht()
 
         self.update_ui_callback = None
-        self.seeder_daemon = Thread(target=self.seeder, args=(args))
+        self.seeder_daemon = Thread(target=self.seeder)
         self.seeder_daemon.daemon = True
         self.seeder_daemon.start()
 
     def set_update_ui_callback(self, callback):
         self.update_ui_callback = callback
 
-    def seeder(self, *args, **kwargs):
-        print("Opening config file : ", args)
-        config = json.load(open(args[1], "r"))
-
-        self.load_torrents(config["torrentsPath"])
+    def seeder(self):
+        config = SlimeDB().get_active_config()
+        self.load_torrents(config.torrent_path)
 
         while True:
             try:
@@ -59,12 +58,11 @@ class TorrentHandler(metaclass=Singleton):
                 return status
 
     def load_torrents(self, torrentpath):
-        files = os.listdir(torrentpath)
-        print("files: " + str(files))
-
-        for file in files:
-            if file.endswith(".torrent"):
-                self.add_torrent(file, torrentpath)
+        for root, dirs, files in os.walk(torrentpath):
+            for file in files:
+                if file.endswith(".torrent"):
+                    print("adding torrent: " + file + " from " + root)
+                    self.add_torrent(file, root)
 
     def add_torrent(self, filename, torrentpath):
         try:
@@ -110,20 +108,17 @@ class TorrentHandler(metaclass=Singleton):
 
         t = libtorrent.create_torrent(fs, 0, 4 * 1024 * 1024)
 
-        t.add_tracker("http://data.slime.club:8000/announce")
-        t.set_creator("libtorrent (Slime) %s" % libtorrent.__version__)
+        t.add_tracker("http://data.slimenetwork.org:8000/announce")
+        t.set_creator("libtorrent (Slime Network) %s" % libtorrent.__version__)
         t.name = os.path.basename(sourcePath)
 
         libtorrent.set_piece_hashes(t, parent_input, lambda x: sys.stdout.write("."))
         sys.stdout.write("\n")
         torrent = t.generate()
 
-        filename = os.path.join(
-            os.path.abspath(torrentPath), os.path.basename(sourcePath) + ".torrent"
-        )
         torrent_code = libtorrent.bencode(torrent)
-        f = open(filename, "wb")
+        f = open(torrentPath, "wb")
         f.write(torrent_code)
         f.close()
-        self.add_torrent(filename, torrentPath)
+        self.add_torrent(torrentPath, torrentPath)
         return torrent_code

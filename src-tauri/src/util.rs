@@ -59,12 +59,12 @@ async fn relay_post_to_sidecar_impl(_app: tauri::AppHandle, params: serde_json::
         .send()
         .await.map_err(|e| format!("Error sending request: {}", e))?;
 
-    println!("responseddddddddddddddd: {:?}", response);
+    println!("response: {:?}", response);
 
     let response_json: serde_json::Value = response.json()
         .await.map_err(|e| format!("Error parsing response: {}", e))?;
 
-    println!("response_json ffffffffffffffffffffff\n\n: {:?}", response_json);
+    println!("response_json \n\n: {:?}", response_json);
 
     Ok(response_json)
 }

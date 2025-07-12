@@ -30,6 +30,10 @@
           {
             "name": "bin/python/torrentclient",
             "sidecar": true
+          },
+          {
+            "name": "../bin/python/streamaudio",
+            "sidecar": true
           }
         ]
       },
@@ -51,7 +55,7 @@
       "resources": [
         "../resources/*"
       ],
-      "externalBin": ["bin/python/torrentclient"]
+      "externalBin": ["bin/python/torrentclient", "bin/python/streamaudio"]
     },
     "security": {
       "csp": null

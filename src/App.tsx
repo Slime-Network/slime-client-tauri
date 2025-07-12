@@ -48,6 +48,12 @@ function App() {
       logo: "../resources/apps/slime-streaming-tools/icon.svg",
     },
     {
+      name: "slime-storefront",
+      title: "Slime Storefront",
+      url: "https://api.slimenetwork.org/apps/store/index.html",
+      logo: "../resources/apps/slime-storefront-app/icon.svg",
+    },
+    {
       name: "about-slime",
       title: "About",
       url: "../resources/apps/about/index.html",
@@ -144,7 +150,7 @@ function App() {
     <div className="container">
       {!collapseImage && 
         <Box sx={{height:"30vh", width:"100%", alignItems:"center", display:"flex", justifyContent:"center"}}> 
-          <img src="src/assets/SlimeNetworkAnim.webp" style={{maxWidth:"90%", maxHeight:"90%", alignSelf: 'center'}} />
+          <img src="src/assets/SlimeNetworkSmallAnim.webp" style={{maxWidth:"90%", maxHeight:"90%", alignSelf: 'center'}} />
         </Box>
       }
       {/* <h2>Installed Apps</h2> */}
