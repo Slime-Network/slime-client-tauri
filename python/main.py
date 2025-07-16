@@ -30,7 +30,7 @@ class RequestHandler(SimpleJSONRPCRequestHandler):
         self.send_header("Max-Http-Header-Size", "1000000000")
         SimpleJSONRPCRequestHandler.end_headers(self)
 
-db = sqlite3.connect("../resources/slime.db", check_same_thread=False)
+db = sqlite3.connect("./_up_/resources/slime.db", check_same_thread=False)
 c = db.cursor()
 
 class SlimeRPC:

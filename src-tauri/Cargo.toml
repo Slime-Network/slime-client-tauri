@@ -10,37 +10,40 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2.3.0", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "shell-sidecar", "dialog-all", "shell-open", "system-tray"] }
+tauri = { version = "2.6.2", features = ["tray-icon", "devtools"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
 tokio = "1.35.1"
 anyhow = "1.0.78"
-base64 = "0.21.5"
+base64 = "0.22.1"
 http = "1.0.0"
-directories = "5.0.1"
+directories = "6.0.0"
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 parking_lot = "0.12.1"
 serde_with = "3.4.0"
-reqwest = { version = "0.11.23", features = ["json", "native-tls"], default-features = false }
-phf = "0.11.2"
-rustls = "0.22.1"
-dirs = "5.0.1"
+reqwest = { version = "0.12.22", features = ["json", "native-tls"], default-features = false }
+phf = "0.12.1"
+rustls = "0.23.29"
+dirs = "6.0.0"
 hex = "0.4.3"
 crypto-hash = "0.3.4"
 sha2 = "0.10.8"
 bencode = "0.1.16"
-secp256k1 = { version="0.28.2", features= ["hashes"] }
-zip = "0.6.6"
+secp256k1 = { version="0.31.1", features= ["hashes"] }
+zip = "4.3.0"
 chrono = "0.4.38"
 rfd = "0.15.2"
-jsonrpsee = { version = "0.24.8", features = ["http-client"] }
+jsonrpsee = { version = "0.25.1", features = ["http-client"] }
 hyper = "1.6.0"
 tower = { version = "0.5.2", features = ["full"] }
-rusqlite = { version = "0.35.0", features = ["bundled"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

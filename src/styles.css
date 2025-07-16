@@ -1,13 +1,13 @@
 
 @font-face {
   font-family: 'Retro';
-  src: url('assets/fonts/Retro.ttf');
+  src: url('../resources/fonts/Retro.ttf');
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Roboto';
-  src: url('assets/fonts/RobotoMono-VariableFont_wght.ttf');
+  src: url('../resources/fonts/RobotoMono-VariableFont_wght.ttf');
   font-weight: 900;
   font-style: normal;
 }

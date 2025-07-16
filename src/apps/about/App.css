@@ -1,0 +1,25 @@
+.gutter {
+	background-color: rgba(61, 61, 61, 0.726);
+	background-repeat: no-repeat;
+	background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+	background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAABHNCSVQICAgIfAhkiAAAADBJREFUKFNjdOmN+M8ABLcnHWdUzbMEs5lABDpglJeXRxfDrpIFZs6omaPhiTUtAQCpPTGDwAsR3gAAAABJRU5ErkJggg==');
+	cursor: col-resize;
+}
+
+.transparency-grid {
+	--color1: #484848;
+	--color2: #909090;
+	--size: 20px;
+	background-size: var(--size) var(--size);
+	background-image: conic-gradient(
+		var(--color1) 90deg,
+		var(--color2) 90deg,
+		var(--color2) 180deg,
+		var(--color1) 180deg,
+		var(--color1) 270deg,
+		var(--color2) 270deg
+	);
+}

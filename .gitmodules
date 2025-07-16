@@ -1,0 +1,3 @@
+[submodule "src/slime-shared"]
+	path = src/slime-shared
+	url = https://github.com/Slime-Network/slime-shared.git

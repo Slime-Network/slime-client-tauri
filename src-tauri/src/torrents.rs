@@ -1,14 +1,6 @@
-use std::fs::File;
-use std::io::Read;
-use std::io;
-
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::http_client::HttpClient;
-use jsonrpsee::rpc_params;
 
 use serde_json::json;
 use std::fs;
-use rfd::FileDialog;
 use rusqlite::{Connection, Result};
 
 
@@ -48,7 +40,7 @@ pub async fn download_media(app: tauri::AppHandle, params: serde_json::Value) ->
 
 async fn download_media_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
     println!("download_media params: {:?}", params);
-    // let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut file = File::open(app.path_resolver().resolve_resource("./assets/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
     // let mut contents = String::new();
     // file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
     
@@ -71,7 +63,7 @@ pub async fn delete_media(app: tauri::AppHandle, params: serde_json::Value) -> R
 
 async fn delete_media_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
     
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+    let conn = Connection::open("./assets/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM activeConfig WHERE id = 1").map_err(|e| format!("Error preparing statement: {}", e))?;
     let config = stmt.query_row([], |row| {
@@ -122,34 +114,34 @@ pub async fn install_media(app: tauri::AppHandle, params: serde_json::Value) -> 
     }
 }
 
-async fn install_media_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
+async fn install_media_impl(_app: tauri::AppHandle, _params: serde_json::Value) -> Result<serde_json::Value, String> {
+    // let mut file = File::open(app.path_resolver().resolve_resource("./assets/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut contents = String::new();
+    // file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
     
-    let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    // let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
-    let torrents_path = format!("{}/{}", config["torrentsPath"], params["productId"].as_str().unwrap());
+    // let torrents_path = format!("{}/{}", config["torrentsPath"], params["productId"].as_str().unwrap());
 
-    let file = File::open(&torrents_path).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Error reading zip: {}", e))?;
+    // let file = File::open(&torrents_path).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Error reading zip: {}", e))?;
 
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| format!("Error reading file from zip: {}", e))?;
-        let outpath = file.mangled_name();
+    // for i in 0..archive.len() {
+    //     let mut file = archive.by_index(i).map_err(|e| format!("Error reading file from zip: {}", e))?;
+    //     let outpath = file.mangled_name();
 
-        if (&*file.name()).ends_with('/') {
-            fs::create_dir_all(&outpath).map_err(|e| format!("Error creating directory: {}", e))?;
-        } else {
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(&p).map_err(|e| format!("Error creating directory: {}", e))?;
-                }
-            }
-            let mut outfile = fs::File::create(&outpath).map_err(|e| format!("Error creating file: {}", e))?;
-            io::copy(&mut file, &mut outfile).map_err(|e| format!("Error writing file: {}", e))?;
-        }
-    }
+    //     if (&*file.name()).ends_with('/') {
+    //         fs::create_dir_all(&outpath).map_err(|e| format!("Error creating directory: {}", e))?;
+    //     } else {
+    //         if let Some(p) = outpath.parent() {
+    //             if !p.exists() {
+    //                 fs::create_dir_all(&p).map_err(|e| format!("Error creating directory: {}", e))?;
+    //             }
+    //         }
+    //         let mut outfile = fs::File::create(&outpath).map_err(|e| format!("Error creating file: {}", e))?;
+    //         io::copy(&mut file, &mut outfile).map_err(|e| format!("Error writing file: {}", e))?;
+    //     }
+    // }
     
 
     Ok(json!({
@@ -167,19 +159,23 @@ pub async fn uninstall_media(app: tauri::AppHandle, params: serde_json::Value) -
     }
 }
 
-async fn uninstall_media_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
+async fn uninstall_media_impl(_app: tauri::AppHandle, _params: serde_json::Value) -> Result<serde_json::Value, String> {
+    // let mut file = File::open(app.path_resolver().resolve_resource("./assets/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut contents = String::new();
+    // file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
     
-    let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    // let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
-    let installs_path = format!("{}/{}", config["installsPath"], params["productId"].as_str().unwrap());
+    // let installs_path = format!("{}/{}", config["installsPath"], params["productId"].as_str().unwrap());
     
-    fs::remove_dir_all(installs_path).map_err(|e| format!("Error deleting directory: {}", e))?;
+    // fs::remove_dir_all(installs_path).map_err(|e| format!("Error deleting directory: {}", e))?;
+    // Ok(json!({
+    //     "status": "uninstalled",
+    //     "message": "Media uninstalled"
+    // }))
     Ok(json!({
-        "status": "uninstalled",
-        "message": "Media uninstalled"
+        "status": "success",
+        "message": "Uninstall media is not implemented yet"
     }))
 }
 
@@ -192,37 +188,41 @@ pub async fn launch_media(app: tauri::AppHandle, params: serde_json::Value) -> R
     }
 }
 
-async fn launch_media_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
+async fn launch_media_impl(_app: tauri::AppHandle, _params: serde_json::Value) -> Result<serde_json::Value, String> {
+    // let mut file = File::open(app.path_resolver().resolve_resource("./assets/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut contents = String::new();
+    // file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
     
-    let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    // let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
-    let installs_path = format!("{}/{}", config["installsPath"], params["productId"].as_str().unwrap());
+    // let installs_path = format!("{}/{}", config["installsPath"], params["productId"].as_str().unwrap());
 
-    // needs the executable added to the path
-    if cfg!(target_os = "windows") {
-        std::process::Command::new("cmd")
-            .args(&["/C", "start", &installs_path])
-            .spawn()
-            .expect("failed to start application");
-    } else if cfg!(target_os = "linux") {
-        std::process::Command::new("xdg-open")
-            .args(&[&installs_path])
-            .spawn()
-            .expect("failed to start application");
-    } else {
-        std::process::Command::new("open")
-            .args(&[&installs_path])
-            .spawn()
-            .expect("failed to start application");
-    }
+    // // needs the executable added to the path
+    // if cfg!(target_os = "windows") {
+    //     std::process::Command::new("cmd")
+    //         .args(&["/C", "start", &installs_path])
+    //         .spawn()
+    //         .expect("failed to start application");
+    // } else if cfg!(target_os = "linux") {
+    //     std::process::Command::new("xdg-open")
+    //         .args(&[&installs_path])
+    //         .spawn()
+    //         .expect("failed to start application");
+    // } else {
+    //     std::process::Command::new("open")
+    //         .args(&[&installs_path])
+    //         .spawn()
+    //         .expect("failed to start application");
+    // }
 
+    // Ok(json!({
+    //     "status": "playing",
+    //     "message": "Media launched",
+    //     "pid": "1234"
+    // }))
     Ok(json!({
-        "status": "playing",
-        "message": "Media launched",
-        "pid": "1234"
+        "status": "success",
+        "message": "Media launch is not implemented yet"
     }))
 }
 
@@ -236,49 +236,53 @@ pub async fn generate_torrent(app: tauri::AppHandle, params: serde_json::Value) 
     }
 }
 
-async fn generate_torrent_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    println!("generate_torrent params: {:?}", params);
-    let mut file = File::open(app.path_resolver().resolve_resource("../resources/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
+async fn generate_torrent_impl(_app: tauri::AppHandle, _params: serde_json::Value) -> Result<serde_json::Value, String> {
+    // println!("generate_torrent params: {:?}", params);
+    // let mut file = File::open(app.asset_resolver().get("./assets/slime-config.json").expect("failed to resolve resource")).map_err(|e| format!("Error opening file: {}", e))?;
+    // let mut contents = String::new();
+    // file.read_to_string(&mut contents).map_err(|e| format!("Error reading file: {}", e))?;
     
-    let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
+    // let config: serde_json::Value = serde_json::from_str(&contents).map_err(|e| format!("Error parsing JSON: {}", e))?;
 
-    let files = FileDialog::new()
-    .set_title("Select Game Folder")
-    .set_directory(&config["mediaDataPath"].as_str().unwrap())
-    .pick_folder();
+    // let files = FileDialog::new()
+    // .set_title("Select Game Folder")
+    // .set_directory(&config["mediaDataPath"].as_str().unwrap())
+    // .pick_folder();
 
-    let folder_path = match files {
-        Some(path) => path,
-        None => return Err("No folder selected".to_string()),
-    };
+    // let folder_path = match files {
+    //     Some(path) => path,
+    //     None => return Err("No folder selected".to_string()),
+    // };
 
-    let full_path = folder_path.to_string_lossy().into_owned();
+    // let full_path = folder_path.to_string_lossy().into_owned();
 
-    println!("full_path: {:?}", full_path);
+    // println!("full_path: {:?}", full_path);
 
-    println!("Params: {:?}", params["mediaFiles"]["name"]);
+    // println!("Params: {:?}", params["mediaFiles"]["name"]);
 
-    let torrent_path = format!("{}/{}", config["torrentsPath"].clone().as_str().unwrap(), params["mediaFiles"]["name"].as_str().unwrap());
+    // let torrent_path = format!("{}/{}", config["torrentsPath"].clone().as_str().unwrap(), params["mediaFiles"]["name"].as_str().unwrap());
 
-    println!("torrents_path: {:?}", torrent_path);
+    // println!("torrents_path: {:?}", torrent_path);
 
-    fs::create_dir_all(torrent_path.clone()).map_err(|e| format!("Error creating directory: {}", e))?;
+    // fs::create_dir_all(torrent_path.clone()).map_err(|e| format!("Error creating directory: {}", e))?;
 
-	let client = HttpClient::builder().build("http://localhost:5235").unwrap();
+	// let client = HttpClient::builder().build("http://localhost:5235").unwrap();
 
-    let file_name = format!("{}/{}-{}.zip", torrent_path, params["mediaFiles"]["name"].as_str().unwrap(), params["mediaFiles"]["version"].as_str().unwrap());
+    // let file_name = format!("{}/{}-{}.zip", torrent_path, params["mediaFiles"]["name"].as_str().unwrap(), params["mediaFiles"]["version"].as_str().unwrap());
 
-    let params = rpc_params![params["mediaFiles"].clone(), full_path, file_name];
-    let response: Result<serde_json::Value, _> = client.request("generateTorrent",  params).await.map_err(|e| format!("Error generating torrent: {}", e));
+    // let params = rpc_params![params["mediaFiles"].clone(), full_path, file_name];
+    // let response: Result<serde_json::Value, _> = client.request("generateTorrent",  params).await.map_err(|e| format!("Error generating torrent: {}", e));
 
-    let resp = response.unwrap();
+    // let resp = response.unwrap();
 
+    // Ok(json!({
+    //     "torrent": resp["torrent"],
+    //     "fileName": resp["fileName"],
+    //     "size": resp["size"],
+    //     "message": "Torrents generated"
+    // }))
     Ok(json!({
-        "torrent": resp["torrent"],
-        "fileName": resp["fileName"],
-        "size": resp["size"],
-        "message": "Torrents generated"
+        "status": "success",
+        "message": "Torrent generation is not implemented yet"
     }))
 }

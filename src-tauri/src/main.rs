@@ -5,9 +5,18 @@ mod torrents;
 mod slime_nostr;
 mod util;
 
-use tauri::api::process::{Command, CommandEvent};
-use tauri::{CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem};
+use tauri::{
+  menu::{Menu, MenuItem},
+  tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+  Builder,
+  Emitter, Manager,
+  path::{BaseDirectory}
+};
 
+use tauri_plugin_shell::process::{CommandEvent, CommandChild};
+use tauri_plugin_shell::ShellExt;
+
+use std::sync::{Arc, Mutex};
 use rusqlite::{Connection, Result, params};
 
 
@@ -25,20 +34,21 @@ fn get_operating_system_impl() -> Result<String, String> {
 }
 
 
-#[tauri::command]
-async fn open_app(app: tauri::AppHandle, app_name: String, title: String, url: String) {
-    tauri::WindowBuilder::new(
-            &app,
-            app_name.clone(), /* set the window label to the app name */
-            tauri::WindowUrl::App(
-                url.into()
-            )
-        )
-        .title(title) /* set the window title to the app name */
-        .inner_size(1500.0, 1200.0)
-        .build()
-        .expect("failed to build window");
-}
+// #[tauri::command]
+// async fn open_app(app: tauri::AppHandle, app_name: String, title: String, url: String) {
+//     println!("Current working directory: {:?}", std::env::current_dir().unwrap());
+//     tauri::WindowBuilder::new(
+//             &app,
+//             app_name.clone(), /* set the window label to the app name */
+//             tauri::WindowUrl::App(
+//                url.into() /* set the window URL to the app's index.html file */
+//             )
+//         )
+//         .title(title) /* set the window title to the app name */
+//         .inner_size(1500.0, 1200.0)
+//         .build()
+//         .expect("failed to build window");
+// }
 
 
 #[tauri::command]
@@ -49,8 +59,11 @@ async fn get_local_media_metadata(app: tauri::AppHandle, params: serde_json::Val
     }
 }
 
-async fn get_local_media_metadata_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn get_local_media_metadata_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM media WHERE productId = ?").map_err(|e| format!("Error preparing statement: {}", e))?;
 
@@ -119,8 +132,9 @@ async fn save_local_media_metadata(app: tauri::AppHandle, media: serde_json::Val
     }
 }
 
-async fn save_local_media_metadata_impl(_app: tauri::AppHandle, media: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn save_local_media_metadata_impl(app: tauri::AppHandle, media: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     let _ = conn.execute(
         "INSERT OR REPLACE INTO media (productId, contentRatings, descriptions, credits, childProducts, lastUpdated, lastUpdatedContent, mediaType, nostrEventId, images, videos, donationAddress, parentProductId, publisherDid, releaseStatus, supportContact, tags, titles, files)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -159,8 +173,9 @@ fn get_config(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
     }
 }
 
-fn get_config_impl(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+fn get_config_impl(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM activeConfig WHERE id = 1").map_err(|e| format!("Error preparing statement: {}", e))?;
     let conf = stmt.query_row([], |row| {
@@ -211,8 +226,9 @@ fn get_minting_config(app: tauri::AppHandle, params: serde_json::Value) -> Resul
     }
 }
 
-fn get_minting_config_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+fn get_minting_config_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM mintingConfig WHERE id = ?").map_err(|e| format!("Error preparing statement: {}", e))?;
     let conf = stmt.query_row([params["id"].as_str().unwrap()], |row| {
@@ -275,8 +291,9 @@ fn set_minting_config(app: tauri::AppHandle, params: serde_json::Value) -> Resul
 }
 
 #[tauri::command]
-fn set_minting_config_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+fn set_minting_config_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     println!("set minting config params: {:?}", params);
     
@@ -307,15 +324,16 @@ fn set_minting_config_impl(_app: tauri::AppHandle, params: serde_json::Value) ->
 }
 
 #[tauri::command]
-async fn get_marketplaces(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    match get_marketplaces_impl().await {
+async fn get_marketplaces(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match get_marketplaces_impl(app).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in get_marketplaces: {}", e)),
     }
 }
 
-async fn get_marketplaces_impl() -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn get_marketplaces_impl(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM marketplaces").map_err(|e| format!("Error preparing statement: {}", e))?;
 
@@ -341,15 +359,17 @@ async fn get_marketplaces_impl() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn add_marketplace(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match add_marketplace_impl(params).await {
+async fn add_marketplace(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match add_marketplace_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in add_marketplace: {}", e)),
     }
 }
 
-async fn add_marketplace_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn add_marketplace_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     println!("add marketplace params: {:?}", params);
     if params["id"].as_i64() >= Some(0) {
         let _ = conn.execute(
@@ -377,15 +397,17 @@ async fn add_marketplace_impl(params: serde_json::Value) -> Result<serde_json::V
 }
 
 #[tauri::command]
-async fn remove_marketplace(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match remove_marketplace_impl(params).await {
+async fn remove_marketplace(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match remove_marketplace_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in remove_marketplace: {}", e)),
     }
 }
 
-async fn remove_marketplace_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn remove_marketplace_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "DELETE FROM marketplaces WHERE id = ?",
         [params["id"].as_i64().unwrap() as i32],
@@ -396,15 +418,17 @@ async fn remove_marketplace_impl(params: serde_json::Value) -> Result<serde_json
 
 
 #[tauri::command]
-async fn set_active_marketplace(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match set_active_marketplace_impl(params).await {
+async fn set_active_marketplace(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match set_active_marketplace_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in set_active_marketplace: {}", e)),
     }
 }
 
-async fn set_active_marketplace_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn set_active_marketplace_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "UPDATE activeConfig SET marketplaceDisplayName = (SELECT displayName FROM marketplaces WHERE id = ?), marketplaceUrl = (SELECT url FROM marketplaces WHERE id = ?) WHERE id = 1",
         [
@@ -416,15 +440,16 @@ async fn set_active_marketplace_impl(params: serde_json::Value) -> Result<serde_
 }
 
 #[tauri::command]
-async fn get_nostr_relays(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    match get_nostr_relays_impl().await {
+async fn get_nostr_relays(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match get_nostr_relays_impl(app).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in get_nostr_relays: {}", e)),
     }
 }
 
-async fn get_nostr_relays_impl() -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn get_nostr_relays_impl(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
     
     let mut stmt = conn.prepare("SELECT * FROM nostrRelays").map_err(|e| format!("Error preparing statement: {}", e))?;
 
@@ -451,15 +476,17 @@ async fn get_nostr_relays_impl() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn add_nostr_relay(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match add_nostr_relay_impl(params).await {
+async fn add_nostr_relay(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match add_nostr_relay_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in add_nostr_relay: {}", e)),
     }
 }
 
-async fn add_nostr_relay_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn add_nostr_relay_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "INSERT OR REPLACE INTO nostrRelays (
             displayName, url
@@ -475,15 +502,17 @@ async fn add_nostr_relay_impl(params: serde_json::Value) -> Result<serde_json::V
 
 
 #[tauri::command]
-async fn remove_nostr_relay(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match remove_nostr_relay_impl(params).await {
+async fn remove_nostr_relay(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match remove_nostr_relay_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in remove_nostr_relay: {}", e)),
     }
 }
 
-async fn remove_nostr_relay_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn remove_nostr_relay_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "DELETE FROM nostrRelays WHERE id = ?",
         [params["id"].as_i64().unwrap() as i32],
@@ -493,16 +522,17 @@ async fn remove_nostr_relay_impl(params: serde_json::Value) -> Result<serde_json
 
 
 #[tauri::command]
-async fn get_identities(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    match get_identities_impl().await {
+async fn get_identities(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match get_identities_impl(app).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in get_identities: {}", e)),
     }
 }
 
-async fn get_identities_impl() -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
-    
+async fn get_identities_impl(app: tauri::AppHandle, ) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+
     let mut stmt = conn.prepare("SELECT * FROM identities").map_err(|e| format!("Error preparing statement: {}", e))?;
 
     let mut identities = Vec::new();
@@ -539,15 +569,17 @@ async fn get_identities_impl() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn add_identity(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match add_identity_impl(params).await {
+async fn add_identity(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match add_identity_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in add_identity: {}", e)),
     }
 }
 
-async fn add_identity_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn add_identity_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     println!("add identity params: {:?}", params);
     let _ = conn.execute(
         "INSERT OR REPLACE INTO identities (
@@ -571,15 +603,17 @@ async fn add_identity_impl(params: serde_json::Value) -> Result<serde_json::Valu
 }
 
 #[tauri::command]
-async fn remove_identity(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match remove_identity_impl(params).await {
+async fn remove_identity(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match remove_identity_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in remove_identity: {}", e)),
     }
 }
 
-async fn remove_identity_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn remove_identity_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "DELETE FROM identities WHERE did = ?",
         [params["did"].as_str().unwrap()],
@@ -590,15 +624,17 @@ async fn remove_identity_impl(params: serde_json::Value) -> Result<serde_json::V
 
 
 #[tauri::command]
-async fn set_active_identity(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match set_active_identity_impl(params).await {
+async fn set_active_identity(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match set_active_identity_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in set_active_identity: {}", e)),
     }
 }
 
-async fn set_active_identity_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn set_active_identity_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "UPDATE activeConfig SET did = ?, activeProof = (SELECT activeProof FROM identities WHERE did = ?) WHERE id = 1",
         [
@@ -610,15 +646,17 @@ async fn set_active_identity_impl(params: serde_json::Value) -> Result<serde_jso
 }
 
 #[tauri::command]
-async fn get_install_paths(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    match get_install_paths_impl().await {
+async fn get_install_paths(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match get_install_paths_impl(app).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in get_install_paths: {}", e)),
     }
 }
 
-async fn get_install_paths_impl() -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn get_install_paths_impl(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     
     let mut stmt = conn.prepare("SELECT * FROM installPaths").map_err(|e| format!("Error preparing statement: {}", e))?;
 
@@ -647,15 +685,17 @@ async fn get_install_paths_impl() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn add_install_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match add_install_path_impl(params).await {
+async fn add_install_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match add_install_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in add_install_path: {}", e)),
     }
 }
 
-async fn add_install_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn add_install_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     println!("add install_path: {:?}", params);
     let _ = conn.execute(
         "INSERT OR REPLACE INTO installPaths (
@@ -671,15 +711,17 @@ async fn add_install_path_impl(params: serde_json::Value) -> Result<serde_json::
 }
 
 #[tauri::command]
-async fn remove_install_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match remove_install_path_impl(params).await {
+async fn remove_install_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match remove_install_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in remove_install_path: {}", e)),
     }
 }
 
-async fn remove_install_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn remove_install_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "DELETE FROM installPaths WHERE id = ?",
         [params["id"].as_i64().unwrap() as i32],
@@ -688,15 +730,17 @@ async fn remove_install_path_impl(params: serde_json::Value) -> Result<serde_jso
 }
 
 #[tauri::command]
-async fn set_active_install_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match set_active_install_path_impl(params).await {
+async fn set_active_install_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match set_active_install_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in set_active_install_path: {}", e)),
     }
 }
 
-async fn set_active_install_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn set_active_install_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "UPDATE activeConfig SET installPath = (SELECT path FROM installPaths WHERE id = ?), installPathDisplayName = (SELECT displayName FROM installPaths WHERE id = ?) WHERE id = 1",
         [
@@ -708,15 +752,17 @@ async fn set_active_install_path_impl(params: serde_json::Value) -> Result<serde
 }
 
 #[tauri::command]
-async fn get_torrent_paths(_app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    match get_torrent_paths_impl().await {
+async fn get_torrent_paths(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    match get_torrent_paths_impl(app).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in get_torrent_paths: {}", e)),
     }
 }
 
-async fn get_torrent_paths_impl() -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn get_torrent_paths_impl(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     
     let mut stmt = conn.prepare("SELECT * FROM torrentPaths").map_err(|e| format!("Error preparing statement: {}", e))?;
 
@@ -742,15 +788,17 @@ async fn get_torrent_paths_impl() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn add_torrent_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match add_torrent_path_impl(params).await {
+async fn add_torrent_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match add_torrent_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in add_torrent_path: {}", e)),
     }
 }
 
-async fn add_torrent_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn add_torrent_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     
     let _ = conn.execute(
         "INSERT OR REPLACE INTO torrentPaths (
@@ -766,15 +814,17 @@ async fn add_torrent_path_impl(params: serde_json::Value) -> Result<serde_json::
 }
 
 #[tauri::command]
-async fn remove_torrent_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match remove_torrent_path_impl(params).await {
+async fn remove_torrent_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match remove_torrent_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in remove_torrent_path: {}", e)),
     }
 }
 
-async fn remove_torrent_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn remove_torrent_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "DELETE FROM torrentPaths WHERE id = ?",
         [params["id"].as_i64().unwrap() as i32],
@@ -783,15 +833,17 @@ async fn remove_torrent_path_impl(params: serde_json::Value) -> Result<serde_jso
 }
 
 #[tauri::command]
-async fn set_active_torrent_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match set_active_torrent_path_impl(params).await {
+async fn set_active_torrent_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match set_active_torrent_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in set_active_torrent_path: {}", e)),
     }
 }
 
-async fn set_active_torrent_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn set_active_torrent_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     println!("set_active_torrent_path: {:?}", params);
     let _ = conn.execute(
         "UPDATE activeConfig SET torrentPath = (SELECT path FROM torrentPaths WHERE id = ?), torrentPathDisplayName = (SELECT displayName FROM torrentPaths WHERE id = ?) WHERE id = 1",
@@ -804,15 +856,17 @@ async fn set_active_torrent_path_impl(params: serde_json::Value) -> Result<serde
 }
 
 #[tauri::command]
-async fn set_minting_data_path(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    match set_minting_data_path_impl(params).await {
+async fn set_minting_data_path(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    match set_minting_data_path_impl(app, params).await {
         Ok(response) => Ok(response),
         Err(e) => Err(format!("Error in set_minting_data_path: {}", e)),
     }
 }
 
-async fn set_minting_data_path_impl(params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+async fn set_minting_data_path_impl(app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
+    let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+    let conn = Connection::open(db_path).map_err(|e| format!("Error opening database: {}", e))?;
+    
     let _ = conn.execute(
         "UPDATE activeConfig SET mintingDataPath = (SELECT path FROM mintingDataPaths WHERE id = ?) WHERE id = 1",
         [
@@ -822,46 +876,148 @@ async fn set_minting_data_path_impl(params: serde_json::Value) -> Result<serde_j
     Ok(serde_json::json!({"status": "saved", "message": "Config saved"}))
 }
 
-async fn start() {
-    let conn = Connection::open("../resources/slime.db").unwrap();
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS media (
-                productId TEXT PRIMARY KEY,
-                contentRatings JSON,
-                descriptions JSON,
-                credits JSON,
-                childProducts JSON,
-                lastUpdated INTEGER,
-                lastUpdatedContent INTEGER,
-                mediaType TEXT,
-                nostrEventId TEXT,
-                images JSON,
-                videos JSON,
-                donationAddress TEXT,
-                parentProductId TEXT,
-                publisherDid TEXT,
-                releaseStatus TEXT,
-                supportContact TEXT,
-                tags JSON,
-                titles JSON,
-                files JSON
-            )",
-        [],
-    );
-    let _ = conn.execute(
-            "CREATE TABLE IF NOT EXISTS identities (
-                did TEXT PRIMARY KEY,
-                activeProof JSON,
-                displayName TEXT,
-                avatar TEXT,
-                bio TEXT,
-                location TEXT,
-                languages JSON,
-                links JSON,
-	            proofs JSON
-            )",
+
+// Helper function to spawn the sidecar and monitor its stdout/stderr
+fn spawn_and_monitor_stream_audio(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Check if a sidecar process already exists
+    println!("[tauri] Checking if stream_audio is already running.");
+    if let Some(state) = app_handle.try_state::<Arc<Mutex<Option<CommandChild>>>>() {
+        let child_process = state.lock().unwrap();
+        if child_process.is_some() {
+            // A sidecar is already running, do not spawn a new one
+            println!("[tauri] stream_audio is already running. Skipping spawn.");
+            return Ok(()); // Exit early since sidecar is already running
+        }
+    }
+    // Spawn sidecar
+    println!("[tauri] Spawning stream_audio sidecar.");
+    let sidecar_command = app_handle
+        .shell()
+        .sidecar("streamaudio.exe --no-vision --no-history --no-ai")
+        .map_err(|e| e.to_string())?;
+    println!("[tauri] Sidecar command created: {:?}", sidecar_command);
+    let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
+    // Store the child process in the app state
+    if let Some(state) = app_handle.try_state::<Arc<Mutex<Option<CommandChild>>>>() {
+        *state.lock().unwrap() = Some(child);
+    } else {
+        return Err("Failed to access app state".to_string());
+    }
+
+    // Spawn an async task to handle sidecar communication
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line_bytes) => {
+                    let line = String::from_utf8_lossy(&line_bytes);
+                    println!("stream_audio stdout: {}", line);
+                    // Emit the line to the frontend
+                    app_handle
+                        .emit("sidecar-stdout", line.to_string())
+                        .expect("Failed to emit stream_audio stdout event");
+                }
+                CommandEvent::Stderr(line_bytes) => {
+                    let line = String::from_utf8_lossy(&line_bytes);
+                    eprintln!("stream_audio stderr: {}", line);
+                    // Emit the error line to the frontend
+                    app_handle
+                        .emit("sidecar-stderr", line.to_string())
+                        .expect("Failed to emit stream_audio stderr event");
+                }
+                _ => {}
+            }
+        }
+    });
+
+    Ok(())
+}
+
+// Define a command to shutdown sidecar process
+#[tauri::command]
+fn shutdown_stream_audio(app_handle: tauri::AppHandle) -> Result<String, String> {
+    println!("[tauri] Received command to shutdown stream_audio.");
+    // Access the stream_audio process state
+    if let Some(state) = app_handle.try_state::<Arc<Mutex<Option<CommandChild>>>>() {
+        let mut child_process = state
+            .lock()
+            .map_err(|_| "[tauri] Failed to acquire lock on stream_audio process.")?;
+
+        if let Some(mut process) = child_process.take() {
+            let command = "shutdown\n"; // Add newline to signal the end of the command
+
+            // Attempt to write the command to the sidecar's stdin
+            if let Err(err) = process.write(command.as_bytes()) {
+                println!("[tauri] Failed to write to stream_audio stdin: {}", err);
+                // Restore the process reference if shutdown fails
+                *child_process = Some(process);
+                return Err(format!("Failed to write to stream_audio stdin: {}", err));
+            }
+
+            println!("[tauri] Sent 'shutdown' command to stream_audio.");
+            Ok("'stream_audio shutdown' command sent.".to_string())
+        } else {
+            println!("[tauri] No active stream_audio process to shutdown.");
+            Err("No active stream_audio process to shutdown.".to_string())
+        }
+    } else {
+        Err("stream_audio process state not found.".to_string())
+    }
+}
+
+// Define a command to start sidecar process.
+#[tauri::command]
+fn start_stream_audio(app_handle: tauri::AppHandle) -> Result<String, String> {
+    println!("[tauri] Received command to start stream_audio.");
+    spawn_and_monitor_stream_audio(app_handle)?;
+    Ok("stream_audio spawned and monitoring started.".to_string())
+}
+
+
+fn main() {
+    Builder::default()
+    .plugin(tauri_plugin_shell::init())
+    .setup(|app| {
+        let db_path = app.path().resolve("../resources/slime.db", BaseDirectory::Resource).expect("Failed to resolve database path");
+        let conn = Connection::open(db_path).unwrap();
+
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS media (
+                    productId TEXT PRIMARY KEY,
+                    contentRatings JSON,
+                    descriptions JSON,
+                    credits JSON,
+                    childProducts JSON,
+                    lastUpdated INTEGER,
+                    lastUpdatedContent INTEGER,
+                    mediaType TEXT,
+                    nostrEventId TEXT,
+                    images JSON,
+                    videos JSON,
+                    donationAddress TEXT,
+                    parentProductId TEXT,
+                    publisherDid TEXT,
+                    releaseStatus TEXT,
+                    supportContact TEXT,
+                    tags JSON,
+                    titles JSON,
+                    files JSON
+                )",
             [],
-    );
+        );
+        let _ = conn.execute(
+                "CREATE TABLE IF NOT EXISTS identities (
+                    did TEXT PRIMARY KEY,
+                    activeProof JSON,
+                    displayName TEXT,
+                    avatar TEXT,
+                    bio TEXT,
+                    location TEXT,
+                    languages JSON,
+                    links JSON,
+                    proofs JSON
+                )",
+                [],
+        );
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS marketplaces (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -904,205 +1060,158 @@ async fn start() {
             [],
         );
 
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS activeConfig (
-                id INTEGER PRIMARY KEY,
-                did TEXT,
-                activeProof JSON,
-                marketplaceDisplayName TEXT,
-                marketplaceUrl TEXT,
-                torrentClientPort INTEGER,
-                languages JSON,
-                installPath TEXT,
-                installPathDisplayName TEXT,
-                torrentPath TEXT,
-                torrentPathDisplayName TEXT,
-                mintingDataPath TEXT
-            )",
-        [],
-    );
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO activeConfig (id, installPath, torrentPath, mintingDataPath, torrentClientPort, languages, installPathDisplayName, torrentPathDisplayName) VALUES (1, './installs', './torrents', './minting', 5235, '[\"english\"]', 'Default', 'Default')",
-        [],
-    );
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS activeConfig (
+                    id INTEGER PRIMARY KEY,
+                    did TEXT,
+                    activeProof JSON,
+                    marketplaceDisplayName TEXT,
+                    marketplaceUrl TEXT,
+                    torrentClientPort INTEGER,
+                    languages JSON,
+                    installPath TEXT,
+                    installPathDisplayName TEXT,
+                    torrentPath TEXT,
+                    torrentPathDisplayName TEXT,
+                    mintingDataPath TEXT
+                )",
+            [],
+        );
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO activeConfig (id, installPath, torrentPath, mintingDataPath, torrentClientPort, languages, installPathDisplayName, torrentPathDisplayName) VALUES (1, './installs', './torrents', './minting', 5235, '[\"english\"]', 'Default', 'Default')",
+            [],
+        );
 
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS mintingConfig (
-                id TEXT PRIMARY KEY,
-                iconUri TEXT,
-                bannerUri TEXT,
-                quantity INTEGER,
-                batchSize INTEGER,
-                edition Text,
-                receiveAddress TEXT,
-                royaltyAddress TEXT,
-                royaltyPercentage INTEGER,
-                displayImageUris JSON,
-                metadataUris JSON,
-                licenseUris JSON,
-                generateOfferFiles TEXT,
-                sensitiveContent TEXT,
-                salePrice REAL,
-                saleAsset JSON,
-                mintingFee INTEGER
-            )",
-        [],
-    );
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS mintingConfig (
+                    id TEXT PRIMARY KEY,
+                    iconUri TEXT,
+                    bannerUri TEXT,
+                    quantity INTEGER,
+                    batchSize INTEGER,
+                    edition Text,
+                    receiveAddress TEXT,
+                    royaltyAddress TEXT,
+                    royaltyPercentage INTEGER,
+                    displayImageUris JSON,
+                    metadataUris JSON,
+                    licenseUris JSON,
+                    generateOfferFiles TEXT,
+                    sensitiveContent TEXT,
+                    salePrice REAL,
+                    saleAsset JSON,
+                    mintingFee INTEGER
+                )",
+            [],
+        );
 
-    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
-    let show = CustomMenuItem::new("show".to_string(), "Open");
-    let tray_menu = SystemTrayMenu::new()
-        .add_item(show)
-        .add_item(hide)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit);
-
-    // let (mut rx, mut _child) = Command::new_sidecar("torrentclient")
-    //     .expect("failed to create `torrentclient` binary command")
-    //     .args(&["../resources/slime.db"])
-    //     .spawn()
-    //     .expect("Failed to spawn sidecar");
-
-    let (mut rx2, mut _child) = Command::new_sidecar("streamaudio")
-        .expect("failed to create `streamaudio` binary command")
-        .args(&["--no-vision", "--no-history", "--no-ai"])
-        .spawn()
-        .expect("Failed to spawn sidecar");
-
-    // tauri::async_runtime::spawn(async move {
-    //     // read events such as stdout
-    //     while let Some(event) = rx.recv().await {
-    //         println!("python event: {:?}", event);
-    //         if let CommandEvent::Stdout(line) = event {
-    //             println!("stdout: {}", line);
-    //         } else if let CommandEvent::Stderr(line) = event {
-    //             println!("stderr: {}", line);
-    //         }
-    //     }
-    //     });
-
-    tauri::async_runtime::spawn(async move {
-        print!("Starting streamaudio sidecar...");
-        // read events such as stdout
-        while let Some(event) = rx2.recv().await {
-            if let CommandEvent::Stdout(line) = event {
-                println!("stdout: {}", line);
-            } else if let CommandEvent::Stderr(line) = event {
-                println!("stderr: {}", line);
+    let quit = MenuItem::with_id(app, "quit".to_string(), "Quit", true, None::<&str>)?;
+    let hide = MenuItem::with_id(app, "hide".to_string(), "Hide", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show".to_string(), "Open", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[
+        &show,
+        &hide,
+        &quit,
+    ])?;
+    
+    TrayIconBuilder::<tauri::Wry>::new()
+        .icon(app.default_window_icon().unwrap().clone())
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_tray_icon_event(|tray: &tauri::tray::TrayIcon<tauri::Wry>, event| match event {
+            TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+            } => {
+            println!("left click pressed and released");
+            // in this example, let's show and focus the main window when the tray is clicked
+            let app: &tauri::AppHandle<tauri::Wry> = tray.app_handle();
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
             }
-        }
-    });
-
-    tauri::Builder::default()
-        .system_tray(SystemTray::new().with_menu(tray_menu))
-        .on_system_tray_event(|app, event| match event {
-        SystemTrayEvent::LeftClick {
-            position: _,
-            size: _,
-            ..
-        } => {
-            println!("system tray received a left click");
-            let windows = app.windows();
-            for (_, window) in &windows {
-                window.show().unwrap();
             }
-        }
-        SystemTrayEvent::RightClick {
-            position: _,
-            size: _,
-            ..
-        } => {
-            println!("system tray received a right click");
-        }
-        SystemTrayEvent::DoubleClick {
-            position: _,
-            size: _,
-            ..
-        } => {
-            println!("system tray received a double click");
-        }
-        SystemTrayEvent::MenuItemClick { id, .. } => {
-            match id.as_str() {
+            _ => {
+            println!("unhandled event {event:?}");
+            }
+        })
+        .on_menu_event(|app, event| match event.id.as_ref() {
             "quit" => {
+                shutdown_stream_audio(app.clone()).ok();
                 std::process::exit(0);
             }
             "hide" => {
-                let windows = app.windows();
+                let windows = app.webview_windows();
                 for (_, window) in &windows {
                     window.hide().unwrap();
                 }
             }
             "show" => {
-                let windows = app.windows();
+                let windows = app.webview_windows();
                 for (_, window) in &windows {
                     window.show().unwrap();
                 }
             }
             _ => {}
-            }
-        }
-        _ => {}
         })
-        .on_window_event(|event| match event.event() {
-            tauri::WindowEvent::CloseRequested { api, .. } => {
-                if event.window().label() == "main" {
-                    event.window().hide().unwrap();
-                    api.prevent_close();
-                }
-            }
-            _ => {}
-        })
-        .invoke_handler(tauri::generate_handler![
-            open_app,
-            get_config,
-            get_minting_config,
-            set_minting_config,
-            get_operating_system,
-            slime_nostr::add_nostr_keypair,
-            slime_nostr::has_nostr_private_key,
-            slime_nostr::sign_nostr_message,
-            get_local_media_metadata,
-            save_local_media_metadata,
-            get_marketplaces,
-            add_marketplace,
-            remove_marketplace,
-            set_active_marketplace,
-            get_nostr_relays,
-            add_nostr_relay,
-            remove_nostr_relay,
-            get_identities,
-            add_identity,
-            remove_identity,
-            set_active_identity,
-            get_install_paths,
-            add_install_path,
-            remove_install_path,
-            set_active_install_path,
-            get_torrent_paths,
-            add_torrent_path,
-            remove_torrent_path,
-            set_active_torrent_path,
-            set_minting_data_path,
-            torrents:: get_install_status,
-            torrents::download_media,
-            torrents::delete_media,
-            torrents::install_media,
-            torrents::uninstall_media,
-            torrents::launch_media,
-            torrents:: generate_torrent,
-            util::get_url_data_hash,
-            util::relay_post_to_sidecar,
-            util::relay_get_to_sidecar
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
-}
+        .build(app)
+        .expect("Failed to build tray icon");
 
-fn main() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .expect("couldn't set up tokio runtime")
-        .block_on(start())
+        app.manage(Arc::new(Mutex::new(None::<CommandChild>)));
+        // Clone the app handle for use elsewhere
+        let app_handle = app.handle().clone();
+        // Spawn the Python sidecar on startup
+        println!("[tauri] Creating stream_audio sidecar...");
+        spawn_and_monitor_stream_audio(app_handle).ok();
+        println!("[tauri] stream_audio Sidecar spawned and monitoring started.");
+
+      Ok(())
+    })
+    .invoke_handler(tauri::generate_handler![
+        // open_app,
+        get_config,
+        get_minting_config,
+        set_minting_config,
+        get_operating_system,
+        slime_nostr::add_nostr_keypair,
+        slime_nostr::has_nostr_private_key,
+        slime_nostr::sign_nostr_message,
+        get_local_media_metadata,
+        save_local_media_metadata,
+        get_marketplaces,
+        add_marketplace,
+        remove_marketplace,
+        set_active_marketplace,
+        get_nostr_relays,
+        add_nostr_relay,
+        remove_nostr_relay,
+        get_identities,
+        add_identity,
+        remove_identity,
+        set_active_identity,
+        get_install_paths,
+        add_install_path,
+        remove_install_path,
+        set_active_install_path,
+        get_torrent_paths,
+        add_torrent_path,
+        remove_torrent_path,
+        set_active_torrent_path,
+        set_minting_data_path,
+        start_stream_audio,
+        shutdown_stream_audio,
+        torrents:: get_install_status,
+        torrents::download_media,
+        torrents::delete_media,
+        torrents::install_media,
+        torrents::uninstall_media,
+        torrents::launch_media,
+        torrents:: generate_torrent,
+        util::get_url_data_hash,
+        util::relay_post_to_sidecar,
+        util::relay_get_to_sidecar
+    ])
+    .run(tauri::generate_context!())
+    .unwrap();
 }

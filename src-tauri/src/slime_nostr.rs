@@ -14,7 +14,7 @@ pub async fn add_nostr_keypair(app: tauri::AppHandle, params: serde_json::Value)
 async fn add_nostr_keypair_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
     println!("adding keys params: {:?}", params);
 
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+    let conn = Connection::open("./assets/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
     let _ = conn.execute("INSERT INTO nostrKeys (publicKey, privateKey, proof) VALUES (?, ?, ?)", &[params["publicKey"].as_str().unwrap(), params["privateKey"].as_str().unwrap(), params["proof"].as_str().unwrap()]).map_err(|e| format!("Error inserting into database: {}", e))?;
     Ok(serde_json::json!({"message": "Keys saved", "status": "success" }))
 }
@@ -29,7 +29,7 @@ pub async fn has_nostr_private_key(app: tauri::AppHandle, params: serde_json::Va
 }
 
 async fn has_nostr_private_key_impl(_app: tauri::AppHandle, params: serde_json::Value) -> Result<serde_json::Value, String> {
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+    let conn = Connection::open("./assets/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
     let mut stmt = conn.prepare("SELECT * FROM nostrKeys WHERE publicKey = ?").map_err(|e| format!("Error preparing statement: {}", e))?;
     
     let keys = stmt.query_row([params["publicKey"].as_str().unwrap()], |row| {
@@ -63,7 +63,7 @@ async fn sign_nostr_message_impl(_app: tauri::AppHandle, params: serde_json::Val
     
     println!("signing message: {:?}", params);
     
-    let conn = Connection::open("../resources/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
+    let conn = Connection::open("./assets/slime.db").map_err(|e| format!("Error opening database: {}", e))?;
 
     let mut stmt = conn.prepare("SELECT * FROM nostrKeys WHERE publicKey = ?").map_err(|e| format!("Error preparing statement: {}", e))?;
     let keys = stmt.query_row([params["publicKey"].as_str().unwrap()], |row| {
@@ -80,13 +80,15 @@ async fn sign_nostr_message_impl(_app: tauri::AppHandle, params: serde_json::Val
     println!("keys: {:?}", keys);
 
     let secp = Secp256k1::new();
-    let secret_key = SecretKey::from_slice(&hex::decode(keys["privateKey"].as_str().unwrap()).unwrap()).unwrap();
+    let private_key_str = keys["privateKey"].as_str().ok_or("privateKey is missing")?;
+    let private_key_bytes = hex::decode(private_key_str).map_err(|e| format!("Error decoding privateKey: {}", e))?;
+    let secret_key = SecretKey::from_slice(&private_key_bytes).map_err(|e| format!("Error creating SecretKey: {}", e))?;
     let keypair = Keypair::from_secret_key(&secp, &secret_key);
-    let message_to_sign = Message::from_digest_slice(hex::decode(params["message"].as_str().unwrap()).unwrap().as_slice()).unwrap();
-    println!("message_to_sign: {:?}", message_to_sign);
-    let real_sig = secp.sign_schnorr_no_aux_rand(&message_to_sign, &keypair);
+    let message_bytes = hex::decode(params["message"].as_str().unwrap()).unwrap();
+    println!("message_bytes: {:?}", message_bytes);
+    let real_sig = secp.sign_schnorr_no_aux_rand(&message_bytes, &keypair);
     // let real_sig = secp.sign_ecdsa(&message_to_sign, &secret_key);
-    let sig = serde_json::Value::String(real_sig.serialize().encode_hex::<String>());
+    let sig = serde_json::Value::String(real_sig.to_byte_array().encode_hex::<String>());
 
     println!("sig final: {:?}", sig);
     Ok(json!({"signature": sig, "message": params["message"].as_str().unwrap(), "status": "signed"}))

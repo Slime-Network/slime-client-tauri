@@ -1,6 +1,5 @@
 import json
 import sqlite3
-import sys
 
 class Media:
     def __init__(self, fromDb):
@@ -126,7 +125,7 @@ class ActiveConfig:
 
 
 class SlimeDB:
-    def __init__(self, db_path='../resources/slime.db'):
+    def __init__(self, db_path='./_up_/resources/slime.db'):
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()

@@ -1,58 +1,62 @@
-import { invoke } from "@tauri-apps/api/tauri";
 import { Grid, ButtonBase, Typography, styled, Box } from "@mui/material";
 import "./App.css";
 import React from "react";
+import { resolveResource } from "@tauri-apps/api/path";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 
 function App() {
 
   async function openApp(appName: string, title: string, url: string) {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    await invoke("open_app", { appName, title, url });
+    const filePath = await convertFileSrc(await resolveResource(url));
+    console.log(`Opening app: ${appName}, title: ${title}, url: ${filePath}`);
+    await invoke("open_app", { appName, title, url: filePath });
+    // await invoke("open_app", { appName, title, url });
   }
 
   const apps = [
-    {
-      name: "slime-library",
-      title: "Library",
-      url: "../resources/apps/slime-library-dapp/index.html",
-      logo: "../resources/apps/slime-library-dapp/icon.svg",
-    },
-    {
-      name: "slime-marketplace",
-      title: "Slime Marketplace",
-      url: "../resources/apps/slime-marketplace-dapp/index.html",
-      logo: "../resources/apps/slime-marketplace-dapp/icon.svg",
-    },
-    {
-      name: "slime-publishing",
-      title: "Publishing",
-      url: "../resources/apps/slime-marketplace-publishing-dapp/index.html",
-      logo: "../resources/apps/slime-marketplace-publishing-dapp/icon.svg",
-    },
-    {
-      name: "slime-settings",
-      title: "Settings",
-      url: "../resources/apps/slime-settings-app/index.html",
-      logo: "../resources/apps/slime-settings-app/icon.svg",
-    },
-    {
-      name: "chia-poker",
-      title: "Chia Poker", 
-      url: "../resources/apps/chia-poker/index.html", 
-      logo: "../resources/apps/chia-poker/icon.svg"
-    },
+    // {
+    //   name: "slime-library",
+    //   title: "Library",
+    //   url: "./apps/slime-library-dapp/index.html",
+    //   logo: "./apps/slime-library-dapp/icon.svg",
+    // },
+    // {
+    //   name: "slime-marketplace",
+    //   title: "Slime Marketplace",
+    //   url: "./apps/slime-marketplace-dapp/index.html",
+    //   logo: "./apps/slime-marketplace-dapp/icon.svg",
+    // },
+    // {
+    //   name: "slime-publishing",
+    //   title: "Publishing",
+    //   url: "./apps/slime-marketplace-publishing-dapp/index.html",
+    //   logo: "./apps/slime-marketplace-publishing-dapp/icon.svg",
+    // },
+    // {
+    //   name: "slime-settings",
+    //   title: "Settings",
+    //   url: "./apps/slime-settings-app/index.html",
+    //   logo: "./apps/slime-settings-app/icon.svg",
+    // },
+    // {
+    //   name: "chia-poker",
+    //   title: "Chia Poker", 
+    //   url: "./apps/chia-poker/index.html", 
+    //   logo: "./apps/chia-poker/icon.svg"
+    // },
     {
       name: "slime-streaming-tools",
       title: "Streaming Tools",
       url: "../resources/apps/slime-streaming-tools/index.html",
       logo: "../resources/apps/slime-streaming-tools/icon.svg",
     },
-    {
-      name: "slime-storefront",
-      title: "Slime Storefront",
-      url: "https://api.slimenetwork.org/apps/store/index.html",
-      logo: "../resources/apps/slime-storefront-app/icon.svg",
-    },
+    // {
+    //   name: "slime-storefront",
+    //   title: "Slime Storefront",
+    //   url: "https://api.slimenetwork.org/apps/store/index.html",
+    //   logo: "./apps/slime-storefront-app/icon.svg",
+    // },
     {
       name: "about-slime",
       title: "About",
@@ -126,11 +130,12 @@ function App() {
     transition: theme.transitions.create('opacity'),
   }));
 
+  const [initialized, setInitialized] = React.useState(false);
   const [collapseImage, setCollapseImage] = React.useState(false);
+  const [logoUrl, setLogoUrl] = React.useState("");
 
   React.useEffect(() => {
     function handleResize() {
-      console.log("resize", window.innerHeight);
       const windowHeight = window.innerHeight;
       if (windowHeight < 600 || window.innerWidth < 200) {
         setCollapseImage(true);
@@ -146,11 +151,23 @@ function App() {
     };
   }, []);
 
+  React.useEffect(() => {
+    const init = async () => {
+      const logoUrl = await convertFileSrc(
+        await resolveResource("../resources/SlimeNetworkSmallAnim.webp")
+      );
+      setLogoUrl(logoUrl);
+    };
+    if (initialized) return;
+    setInitialized(true);
+    init();
+  }, [initialized]);
+
   return (
     <div className="container">
       {!collapseImage && 
         <Box sx={{height:"30vh", width:"100%", alignItems:"center", display:"flex", justifyContent:"center"}}> 
-          <img src="src/assets/SlimeNetworkSmallAnim.webp" style={{maxWidth:"90%", maxHeight:"90%", alignSelf: 'center'}} />
+          <img src={logoUrl} style={{maxWidth:"90%", maxHeight:"90%", alignSelf: 'center'}} />
         </Box>
       }
       {/* <h2>Installed Apps</h2> */}
@@ -158,7 +175,7 @@ function App() {
       <Box sx={{overflowY:"auto", overflowX:"hidden", height:`${collapseImage ? "100vh" : "70vh"}`}}> 
         <Grid container spacing={1}>
           {apps.map((app) => (
-            <Grid key={app.title} item xs={12} sm={6} md={4} lg={3}>
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <ImageButton
                 focusRipple
                 key={app.title}
